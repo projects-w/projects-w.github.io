@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Evaluator</title>
+  <!-- MathJax for LaTeX -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <!-- Highlight.js for code display -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+    .question { font-weight: bold; margin-bottom: 10px; }
+    .answer { margin: 8px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background: #fafafa; }
+    button { margin: 6px; padding: 8px 12px; border-radius: 5px; cursor: pointer; }
+    #datasets { margin-bottom: 20px; }
+    #result { margin-top: 30px; font-size: 1.1em; }
+    /* Fixed timer top-right */
+    #timerBox {
+      position: fixed;
+      top: 10px;
+      right: 20px;
+      background: #fff;
+      border: 2px solid darkred;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-weight: bold;
+      color: darkred;
+      z-index: 999;
+    }
+    .error-message {
+      color: red;
+      margin: 10px 0;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Evaluator</h1>
+  <div id="timerBox">Time left: --</div>
+  <p>Select a dataset to start evaluation:</p>
+  <div id="datasets"></div>
+  <div id="quiz"></div>
+  <div id="result"></div>
+
+<script>
+// ⚠️ List dataset directories manually here
+let datasets = [
+  { name: "Math500 Qwen1.5B Ours", dir: "./test_math500_qwen1.5b_ours" },
+  { name: "GSM8K Qwen1.5B Ours", dir: "./test_gsm8k_qwen1.5b_ours" },
+  { name: "MinervaMath Qwen1.5B Ours", dir: "./test_minervamath_qwen1.5b_ours" },
+  { name: "AIME24 Qwen1.5B Ours", dir: "./test_aime24_qwen1.5b_ours" },
+  { name: "AMC23 Qwen1.5B Ours", dir: "./test_amc23_qwen1.5b_ours" },
+  { name: "OlympiadBench Qwen1.5B Ours", dir: "./test_olympiadbench_qwen1.5b_ours" },
+];
+
+let questions = [];
+let labels = [];
+let current = 0;
+let userAnswers = []; // 2D array: [questionIndex][answerIndex] = selection
+let timerId = null;
+let timeLeft = 30;
+let currentDatasetDir = "";
+
+function initButtons() {
+  const container = document.getElementById("datasets");
+  container.innerHTML = "";
+  datasets.forEach(ds => {
+    const btn = document.createElement("button");
+    btn.textContent = ds.name;
+    btn.onclick = ()=> loadDataset(ds.dir);
+    container.appendChild(btn);
+  });
+}
+
+function formatText(txt) {
+    txt = txt.replace(/od\{/g, 'mod\{');
+    // 1. 直接修复 \ + 换行 + [ 的问题，去掉反斜杠和换行
+    txt = txt.replace(/\\\s*\n\s*\[/g, '\\[');
+    
+    // 2. 同样修复 ] + 换行 + \ 的问题
+    // txt = txt.replace(/\]\s*\n\s*\\/g, '\\]');
+    
+    // 3. 提取并保护代码块
+    const codeBlocks = [];
+    let codeBlockIndex = 0;
+    
+    txt = txt.replace(/```([\s\S]*?)```/g, (match, code) => {
+        codeBlocks.push(code);
+        return `:::CODEBLOCK${codeBlockIndex++}:::`;
+    });
+
+    // 4. 提取并保护LaTeX公式块（$$...$$ 和 \[...\]）
+    const formulaBlocks = [];
+    let formulaBlockIndex = 0;
+    
+    txt = txt.replace(/\$\$([\s\S]*?)\$\$/g, (match, formula) => {
+        formulaBlocks.push(formula);
+        return `:::FORMULA${formulaBlockIndex++}:::`;
+    });
+    
+    txt = txt.replace(/\\\[([\s\S]*?)\\\]/g, (match, formula) => {
+        formulaBlocks.push(formula);
+        return `:::FORMULA${formulaBlockIndex++}:::`;
+    });
+
+    // 5. 处理 Markdown 换行
+    txt = txt.replace(/\n\n+/g, '</p><p>');
+    txt = txt.replace(/\n/g, '<br>');
+    txt = `<p>${txt}</p>`;
+
+    // 6. 修复 Markdown 加粗
+    txt = txt.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    // 7. 恢复公式块
+    for (let i = 0; i < formulaBlocks.length; i++) {
+        const placeholder = `:::FORMULA${i}:::`;
+        txt = txt.replace(placeholder, `\\[${formulaBlocks[i]}\\]`);
+    }
+
+    // 8. 恢复代码块
+    for (let i = 0; i < codeBlocks.length; i++) {
+        const placeholder = `:::CODEBLOCK${i}:::`;
+        const codeContent = codeBlocks[i].replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        txt = txt.replace(placeholder, `</p><pre><code>${codeContent}</code></pre><p>`);
+    }
+
+    // 9. 处理 LaTeX 行内公式
+    txt = txt.replace(/\$(.+?)\$/g, '\\($1\\)');
+
+    // 10. 清除多余空段落
+    txt = txt.replace(/<p>\s*<\/p>/g, '');
+
+    return txt;
+}
+
+
+async function loadDataset(dir) {
+  currentDatasetDir = dir;
+  const mdText = await fetch(dir + "/output.md").then(r => r.text());
+  labels = await fetch(dir + "/label.json").then(r => r.json());
+
+  // Split MD into tests
+  const parts = mdText.split(/## Test \d+/).slice(1);
+  questions = parts.map((block, idx) => {
+    const qMatch = block.match(/### Question([\s\S]*?)### Answer/);
+    const question = qMatch ? qMatch[1].trim() : "Unknown question";
+    const answers = [...block.matchAll(/### Answer \d+:([\s\S]*?)(?=(### Answer|\-\-\-|$))/g)]
+                     .map(m => m[1].trim());
+    return { question, answers };
+  });
+
+  current = 0;
+  // Initialize user answers as 2D array with -1 (unselected)
+  userAnswers = questions.map(question => Array(question.answers.length).fill(-1));
+  document.getElementById("result").innerHTML = "";
+  showQuestion();
+}
+
+function showQuestion() {
+  clearInterval(timerId);
+  if (current >= questions.length) { 
+    saveUserSelections(); // Save selections when finished
+    finish(); 
+    return; 
+  }
+
+  const q = questions[current];
+  const container = document.getElementById("quiz");
+  container.innerHTML = "";
+
+  const card = document.createElement("div");
+  card.className = "card";
+
+  // Add error message area
+  const errorDiv = document.createElement("div");
+  errorDiv.className = "error-message";
+  errorDiv.id = "errorMessage";
+  errorDiv.style.display = "none";
+  card.appendChild(errorDiv);
+
+  const qEl = document.createElement("div");
+  qEl.className = "question";
+  qEl.innerHTML = "Q" + (current+1) + ": " + formatText(q.question);
+  card.appendChild(qEl);
+
+  q.answers.forEach((ans, ansIdx) => {
+    const div = document.createElement("div");
+    div.className = "answer";
+
+    // Add a line break and "Answer: idx" text before each answer
+    const ansidxtext = document.createElement("div");
+    ansidxtext.style.marginBottom = "8px";
+    ansidxtext.style.fontWeight = "bold";
+    ansidxtext.textContent = "Answer:" + (ansIdx + 1);
+    div.appendChild(ansidxtext);
+    
+    div.appendChild(document.createTextNode("\n")); // Add line break
+    
+    // Add the answer content
+    const answerContent = document.createElement("div");
+    answerContent.innerHTML = formatText(ans);
+    div.appendChild(answerContent);
+    
+    // Add a line break and "Please select" text before each answer
+    const selectPrompt = document.createElement("div");
+    selectPrompt.style.marginBottom = "8px";
+    selectPrompt.style.fontWeight = "bold";
+    selectPrompt.textContent = "Please select:";
+    div.appendChild(selectPrompt);
+    
+    div.appendChild(document.createTextNode("\n")); // Add line break
+
+    // Add radio buttons for each option (0,1,2)
+    // Each answer has its own independent radio group
+    for (let c=0; c<3; c++){
+      const rb = document.createElement("input");
+      rb.type = "radio"; 
+      rb.name = `ans_${current}_${ansIdx}`; // Unique group for each answer
+      rb.value = c;
+      // Set checked state if there's a saved selection
+      if (userAnswers[current][ansIdx] === c) {
+        rb.checked = true;
+      }
+      rb.onchange = () => {
+        userAnswers[current][ansIdx] = parseInt(c);
+        // Hide error message when a selection is made
+        document.getElementById("errorMessage").style.display = "none";
+      };
+      div.appendChild(rb);
+      div.appendChild(document.createTextNode(` ${c} `));
+    }
+    card.appendChild(div);
+  });
+
+  const nextBtn = document.createElement("button");
+  nextBtn.textContent = "Next";
+  nextBtn.onclick = () => {
+    // Check if all answers have been selected
+    const allAnswered = q.answers.every((_, ansIdx) => {
+      return userAnswers[current][ansIdx] !== -1;
+    });
+
+    if (!allAnswered) {
+      const errorMsg = document.getElementById("errorMessage");
+      errorMsg.textContent = "Please select an option for all answers before continuing!";
+      errorMsg.style.display = "block";
+      return; // Don't proceed until all answers are selected
+    }
+    
+    current++; 
+    showQuestion(); 
+  };
+  card.appendChild(nextBtn);
+
+  container.appendChild(card);
+
+  // Timer logic
+  timeLeft = 30;
+  updateTimer();
+  timerId = setInterval(()=>{
+    timeLeft--;
+    updateTimer();
+    if (timeLeft <= 0) { 
+      clearInterval(timerId); 
+      // Move to next question when time runs out
+      current++; 
+      showQuestion(); 
+    }
+  }, 1000);
+
+  // Refresh rendering
+  MathJax.typesetPromise();
+  document.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+}
+
+function updateTimer() {
+  document.getElementById("timerBox").textContent = `Time left: ${timeLeft}s`;
+}
+
+// Save user selections as JSON file with dataset-specific filename
+function saveUserSelections() {
+  // Create structure matching label.json format
+  const selections = userAnswers;
+  
+  // Extract dataset name from directory path to use as prefix
+  // Split directory path and get the last segment
+  const dirSegments = currentDatasetDir.split('/').filter(segment => segment);
+  const datasetName = dirSegments.length > 0 ? dirSegments[dirSegments.length - 1] : 'unknown_dataset';
+  
+  // Create filename with dataset prefix
+  const fileName = `${datasetName}_select.json`;
+  
+  // Create JSON blob
+  const jsonStr = JSON.stringify(selections, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  
+  // Create download link and trigger download
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  
+  // Clean up
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 0);
+}
+
+function finish() {
+  document.getElementById("quiz").textContent = "";
+  let total = 0;
+  let correct = 0;
+  let c0 = 0, c1 = 0, c2 = 0;
+  let tot0 = 0, tot1 = 0, tot2 = 0;
+
+  labels.forEach((labSet, qIdx) => {
+    labSet.forEach((lab, ansIdx) => {
+      total++;
+      // Count total for each class
+      if (lab === 0) tot0++;
+      if (lab === 1) tot1++;
+      if (lab === 2) tot2++;
+      
+      // Get user answer, default to -1 if not available
+      const userAns = userAnswers[qIdx] && userAnswers[qIdx][ansIdx] !== undefined 
+        ? userAnswers[qIdx][ansIdx] 
+        : -1;
+      
+      // Only count as correct if user selected an option and it matches the label
+      if (userAns !== -1 && userAns === lab) {
+        correct++;
+        if (lab === 0) c0++;
+        if (lab === 1) c1++;
+        if (lab === 2) c2++;
+      }
+    });
+  });
+
+  // Calculate accuracy, handle division by zero
+  const acc0 = tot0 > 0 ? (c0 / tot0 * 100).toFixed(1) : "N/A";
+  const acc1 = tot1 > 0 ? (c1 / tot1 * 100).toFixed(1) : "N/A";
+  const acc2 = tot2 > 0 ? (c2 / tot2 * 100).toFixed(1) : "N/A";
+  
+  const res = `
+  <h2>Results</h2>
+  Overall Accuracy: ${(correct / total * 100).toFixed(2)}%<br>
+  Class 0: ${c0}/${tot0} = ${acc0}%<br>
+  Class 1: ${c1}/${tot1} = ${acc1}%<br>
+  Class 2: ${c2}/${tot2} = ${acc2}%<br>
+  `;
+  document.getElementById("result").innerHTML = res;
+}
+
+initButtons();
+</script>
+</body>
+</html>
