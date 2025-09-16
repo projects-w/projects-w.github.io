@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Verifier — Trust Judgement Task</title>
+  <style>
+    :root {
+      --bg-light: #f5f5f5;
+      --bg-dark: #0a0a0a;
+      --card-light: #fff;
+      --card-dark: #1e1e1e;
+      --text-light: #333;
+      --text-dark: #e6eef8;
+      --muted-light: #666;
+      --muted-dark: #9aa6bf;
+      --accent: #6ee7b7;
+      --accent-2: #60a5fa;
+      --glass-light: rgba(255,255,255,0.9);
+      --glass-dark: rgba(0,0,0,0.3);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+
+    body.light {
+      background: var(--bg-light);
+      color: var(--text-light);
+    }
+    body.dark {
+      background: var(--bg-dark);
+      color: var(--text-dark);
+    }
+
+    .container { max-width: 1200px; margin: 28px auto; padding: 20px; }
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    .sub{font-size:13px;}
+
+    .panel {
+      background: var(--glass-light);
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 6px 24px rgba(2,6,23,0.1);
+      border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    body.dark .panel {
+      background: var(--glass-dark);
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+
+    .controls{display:flex;gap:12px;align-items:center}
+    select,input[type=number]{background:transparent;border:1px solid rgba(0,0,0,0.1);padding:8px 10px;border-radius:8px;color:inherit}
+    button.primary{background:linear-gradient(90deg,var(--accent),var(--accent-2));border:none;padding:9px 14px;border-radius:10px;font-weight:600;cursor:pointer;color:#04202a}
+    button.ghost{background:transparent;border:1px solid rgba(0,0,0,0.1);padding:8px 12px;border-radius:10px;color:var(--muted-light);cursor:pointer}
+
+    .instruction{margin-top:12px;font-size:14px;line-height:1.5;color:var(--muted-light)}
+
+    .quiz-area{margin-top:18px}
+    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .question-box{
+      background: var(--card-light);
+      padding:16px;
+      border-radius:10px;
+      border:1px solid #ddd;
+      min-height:110px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    body.dark .question-box { background: var(--card-dark); border:1px solid rgba(255,255,255,0.03); }
+
+    .qtext{font-size:15px;line-height:1.6}
+
+    .answers-row{display:flex;gap:12px;margin-top:12px;align-items:stretch;justify-content:center;flex-wrap:wrap}
+    .answer-card{flex:1 1 0;min-width:0;background:var(--card-light);padding:12px;border-radius:10px;border:1px solid #ddd;display:flex;flex-direction:column;justify-content:space-between;max-width:450px;}
+    body.dark .answer-card{background:var(--card-dark);border:1px solid rgba(255,255,255,0.03);}
+    .ans-text{flex:1;overflow:auto;font-size:14px;padding-bottom:8px}
+    .ans-controls{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:12px}
+    .btn-choose{flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(0,0,0,0.1);background:transparent;cursor:pointer}
+    .btn-choose.selected.trust{background:rgba(102,255,204,0.12);border-color:rgba(102,255,204,0.18);color:var(--accent)}
+    .btn-choose.selected.not{background:rgba(255,102,102,0.06);border-color:rgba(255,100,100,0.12);color:#ff9ea0}
+
+    .controls-row{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-top:14px}
+    .progress{font-size:13px;color:var(--muted-light)}
+    .timer{font-weight:700;background:rgba(0,0,0,0.05);padding:6px 10px;border-radius:8px;border:1px solid rgba(0,0,0,0.1)}
+
+    footer{margin-top:22px;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted-light)}
+
+    .center{display:flex;align-items:center;justify-content:center}
+    .hidden{display:none}
+  </style>
+  <script>
+    window.MathJax = {tex:{inlineMath:[['\\(','\\)'],['$','$']]}, options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body class="light">
+  <div class="container">
+    <header>
+      <div>
+        <h1>Verifier — Trust Judgement Task</h1>
+        <div class="sub">Quick, modern interface for judging answer trustworthiness</div>
+      </div>
+      <div class="sub">Make choices: <strong>Trust</strong>=1 &nbsp; <strong>Don't Trust</strong>=0 &nbsp; <strong>Timeout</strong>=-1</div>
+    </header>
+
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="controls">
+          <label class="sub">Choose dataset:</label>
+          <select id="datasetSelect"></select>
+          <label class="sub"># questions:</label>
+          <input id="qcount" type="number" min="1" max="120" value="20" style="width:86px">
+          <button id="startBtn" class="primary">Start</button>
+          <button id="resetBtn" class="ghost">Reset</button>
+        </div>
+        <div style="text-align:right;max-width:420px">
+          <div class="instruction" id="instruction">
+            <strong>Instructions:</strong> For each question, you will see three candidate answers. For each candidate, choose either <em>Trust</em> (you believe the answer is correct) or <em>Don't Trust</em> (you believe the answer is incorrect). You have 30 seconds per question. When all questions are finished you will download a JSON file containing the chosen question indices and your per-answer judgments.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="quiz-area hidden" id="quizArea">
+      <div class="topbar">
+        <div class="progress" id="progress">Question 0 / 0</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div class="timer" id="timer">30s</div>
+        </div>
+      </div>
+
+      <div class="question-box">
+        <div class="qtext" id="qtext">Question will appear here</div>
+      </div>
+
+      <div class="answers-row" id="answersRow"></div>
+
+      <div class="controls-row">
+        <div>
+          <button id="prevBtn" class="ghost">Previous</button>
+          <button id="nextBtn" class="primary">Next</button>
+        </div>
+        <div class="sub" id="statusNote">Make a choice for each answer to enable Next.</div>
+      </div>
+    </div>
+
+    <footer>
+      <div>Layout: modern, minimal, responsive. Rendered with MathJax for LaTeX support.</div>
+      <div>&copy; Verifier</div>
+    </footer>
+  </div>
+
+    <script>
+    // Theme switch
+    function setTheme(mode){
+      document.body.classList.remove('light','dark');
+      document.body.classList.add(mode);
+    }
+    // Try to detect dataset directories T1..T20 automatically by probing for questions.json
+    const MAX_DS = 20;
+    const datasetSelect = document.getElementById('datasetSelect');
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const qcountInput = document.getElementById('qcount');
+    const instructionEl = document.getElementById('instruction');
+
+    let foundDatasets = [];
+
+    async function probeDatasets(){
+      const candidates = [];
+      // common pattern T1,T2 etc. Also allow user to type custom path by editing the select.
+      for(let i=1;i<=MAX_DS;i++){
+        const name = 'T'+i;
+        try{
+          const res = await fetch(`${name}/questions.json`, {method:'HEAD'});
+          if(res.ok) candidates.push(name);
+        }catch(e){/* ignore */}
+      }
+      // If none found, still populate with T1..T3 for easier local editing
+      if(candidates.length===0){
+        candidates.push('T1','T2');
+      }
+      return candidates;
+    }
+
+    function populateDatasetSelect(list){
+      datasetSelect.innerHTML = '';
+      list.forEach(name=>{
+        const opt = document.createElement('option');opt.value=name;opt.textContent=name;datasetSelect.appendChild(opt);
+      });
+      // allow user to type custom path name
+      const other = document.createElement('option');other.value='__custom__';other.textContent='-- Type custom folder name --';datasetSelect.appendChild(other);
+    }
+
+    // Parse question text: extract content between "user\n" and "\nassistant" or after "user\n"
+    function extractQuestion(raw){
+      if(!raw) return '';
+      const s = raw.replace(/\\r/g,'').trim();
+      const m = s.match(/user\n([\s\S]*?)(?:\nassistant|$)/i);
+      if(m) return m[1].trim();
+      // fallback: remove role lines like system\n ...\n user\n etc.
+      return s.replace(/^(system|user|assistant)\n/ig,'').trim();
+    }
+
+    // state
+    let questions = []; // array of 120 questions for chosen dataset
+    let answers = []; // array of 120 arrays of 3 answers
+    let chosenIndices = []; // shuffled indices selected for this run
+    let userChoices = []; // per-question array of 3 values (1,0,-1)
+    let currentQ = 0; let totalQ = 0; let timerInterval=null; let timeLeft=30;
+
+    function formatSeconds(s){return s+ 's';}
+
+    // Render a question
+    function renderQuestion(pos){
+      const qi = chosenIndices[pos];
+      const qraw = questions[qi];
+      const qtext = extractQuestion(qraw);
+      document.getElementById('qtext').innerHTML = qtext ? ('<div>'+qtext.replace(/\n/g,'<br>')+'</div>') : '<em>(empty)</em>';
+      // render 3 answers horizontally
+      const row = document.getElementById('answersRow'); row.innerHTML='';
+      const ansTrip = answers[qi];
+      for(let i=0;i<3;i++){
+        const card = document.createElement('div'); card.className='answer-card';
+        const at = document.createElement('div'); at.className='ans-text'; at.innerHTML = (ansTrip[i]||'').replace(/\n/g,'<br>');
+        const controls = document.createElement('div'); controls.className='ans-controls';
+        const btnTrust = document.createElement('button'); btnTrust.className='btn-choose'; btnTrust.textContent='Trust';
+        const btnNot = document.createElement('button'); btnNot.className='btn-choose'; btnNot.textContent="Don't Trust";
+        // restore previous selection
+        const cur = userChoices[pos][i];
+        if(cur===1) btnTrust.classList.add('selected','trust');
+        if(cur===0) btnNot.classList.add('selected','not');
+
+        btnTrust.addEventListener('click',()=>{
+          userChoices[pos][i]=1; btnTrust.classList.add('selected','trust'); btnNot.classList.remove('selected','not'); updateNextStatus();
+        });
+        btnNot.addEventListener('click',()=>{
+          userChoices[pos][i]=0; btnNot.classList.add('selected','not'); btnTrust.classList.remove('selected','trust'); updateNextStatus();
+        });
+
+        controls.appendChild(btnTrust); controls.appendChild(btnNot);
+        card.appendChild(at); card.appendChild(controls);
+        row.appendChild(card);
+      }
+
+      document.getElementById('progress').textContent = `Question ${pos+1} / ${totalQ}`;
+      // reset timer
+      resetTimer();
+      updateNextStatus();
+      MathJax.typesetPromise();
+    }
+
+    function updateNextStatus(){
+      // Next enabled only if all three answers for currentQ are chosen (not -1)
+      const allChosen = userChoices[currentQ].every(v=>v===0||v===1);
+      document.getElementById('nextBtn').disabled = !allChosen;
+      document.getElementById('nextBtn').style.opacity = allChosen?1:0.6;
+      document.getElementById('statusNote').textContent = allChosen? 'All answers chosen — proceed.' : 'Make a choice for each answer to enable Next.';
+    }
+
+    function resetTimer(){
+      clearInterval(timerInterval); timeLeft = 30; document.getElementById('timer').textContent = formatSeconds(timeLeft);
+      timerInterval = setInterval(()=>{
+        timeLeft--; document.getElementById('timer').textContent = formatSeconds(timeLeft);
+        if(timeLeft<=0){
+          clearInterval(timerInterval);
+          // mark unchosen as -1
+          for(let i=0;i<3;i++){ if(userChoices[currentQ][i]!==0 && userChoices[currentQ][i]!==1) userChoices[currentQ][i]=-1; }
+          // auto advance
+          goNext(true);
+        }
+      },1000);
+    }
+
+    function goNext(auto=false){
+      // if not auto, require all chosen
+      const allChosen = userChoices[currentQ].every(v=>v===0||v===1);
+      if(!auto && !allChosen){ alert('Please choose Trust or Don\'t Trust for all three answers before proceeding.'); return; }
+      clearInterval(timerInterval);
+      if(currentQ < totalQ-1){ currentQ++; renderQuestion(currentQ); } else { finishAndDownload(); }
+    }
+    function goPrev(){ if(currentQ>0){ clearInterval(timerInterval); currentQ--; renderQuestion(currentQ);} }
+
+    function finishAndDownload(){
+      // compile results: for each question in chosenIndices save {index, question, answers, userChoices}
+      const out = {dataset: datasetSelect.value, chosen_indices: chosenIndices, entries:[]};
+      for(let i=0;i<chosenIndices.length;i++){
+        const idx = chosenIndices[i];
+        out.entries.push({index: idx, question: questions[idx], answers: answers[idx], choices: userChoices[i]});
+      }
+      const blob = new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download = `${datasetSelect.value}_results_${Date.now()}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      alert('All done — JSON downloaded.');
+      // reset UI
+      document.getElementById('quizArea').classList.add('hidden');
+    }
+
+    // navigation
+    document.getElementById('nextBtn').addEventListener('click',()=>goNext(false));
+    document.getElementById('prevBtn').addEventListener('click',()=>goPrev());
+    resetBtn.addEventListener('click',()=>location.reload());
+
+    // Start: load dataset and randomly select questions
+    startBtn.addEventListener('click',async()=>{
+      const ds = datasetSelect.value;
+      if(ds==='__custom__'){
+        const v = prompt('Type folder name relative to this index.html (e.g. T1)'); if(!v) return; datasetSelect.value = v; return; }
+      const qcount = parseInt(qcountInput.value||0,10);
+      if(!(qcount>=1 && qcount<=120)){ alert('Choose a number between 1 and 120.'); return; }
+      try{
+        // fetch questions.json and answers.json
+        const qres = await fetch(`${ds}/questions.json`); if(!qres.ok) throw new Error('Cannot fetch questions.json');
+        const ares = await fetch(`${ds}/answers.json`); if(!ares.ok) throw new Error('Cannot fetch answers.json');
+        questions = await qres.json(); answers = await ares.json();
+        if(!Array.isArray(questions) || !Array.isArray(answers) || questions.length!==answers.length){ throw new Error('questions/answers invalid or length mismatch'); }
+        // build index list 0..n-1 and shuffle
+        const n = questions.length; const indices = Array.from({length:n},(_,i)=>i);
+        // shuffle with Fisher-Yates
+        for(let i=n-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [indices[i],indices[j]]=[indices[j],indices[i]]; }
+        // pick first qcount indices
+        chosenIndices = indices.slice(0,qcount);
+        // prepare userChoices array with default nulls
+        userChoices = Array.from({length:qcount},()=>[null,null,null]);
+        totalQ = qcount; currentQ=0;
+        document.getElementById('quizArea').classList.remove('hidden');
+        // show instruction at top of quiz area (already present)
+        renderQuestion(0);
+      }catch(err){alert('Error loading dataset: '+err.message); }
+    });
+
+    // init
+    (async ()=>{
+      foundDatasets = await probeDatasets(); populateDatasetSelect(foundDatasets);
+    })();
+    // Theme switch
+    function setTheme(mode){
+      document.body.classList.remove('light','dark');
+      document.body.classList.add(mode);
+    }
+  </script>
+</body>
+</html>
