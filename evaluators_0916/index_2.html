@@ -160,19 +160,18 @@
         </div>
         <div style="max-width:1200px">
           <div class="instruction" id="instruction">
-            <strong>Instructions:</strong> You will be given a question along with three answers. Your task is to decide whether you trust each response.<br><br>
+            <strong>Instructions:</strong> You will be shown one question and <b>three</b> LLM answers. For <b>each</b> answer, quickly judge the <i>reasoning quality</i> — <u>not</u> the final result. A fast skim is enough.<br><br>
 
-            You do not need to calculate the exact solution. A quick review is enough to judge.<br><br>
+            Do <u>not</u> base your judgment on whether the final answer is correct — any or all answers may be wrong. <b>Important:</b> Each question can have any mix of correct and wrong answers—sometimes all three are wrong, sometimes all three are right, and anything in between. <u>Do not infer patterns</u> (e.g., “two right and one wrong”). Judge each answer’s reasoning independently.<br><br>
 
-            Do not base your judgment on whether the final answer is correct — all answers may be wrong.<br><br>
+            <b>Go with your first instinct.</b> You have <b>60 seconds</b> per question (≈15–20 seconds per answer).<br><br>
 
-            Instead, focus on the reasoning process:<br><br>
+            Choose <b>Trust</b> if the reasoning is coherent and step-by-step and has no major leaps or contradictions.<br>
+            Choose <b>Don’t Trust</b> if the reasoning is vague or guess-based, contradicts itself or changes assumptions midstream, or justifies itself only by the final number.<br><br>
 
-            Choose <b>Trust</b> if you find the reasoning reliable. Choose <b>Don't Trust</b> if the reasoning is unreliable.<br><br>
-
-            You will have 60 seconds per question.<br><br>
-
-            Example: A detailed and well-structured explanation leading to the wrong number should still be marked <b>Trust</b>. A disorganized or shallow explanation that accidentally lands on the correct number should be marked <b>Don't Trust</b>.
+            <b>Remember:</b> Judge the <i>process</i>, not the result.<br>
+            <i>A clear, sensible path to a wrong number/correct number → <b>Trust</b>.</i><br>
+            <i>A shaky, lucky path to the right answer → <b>Don’t Trust</b>.</i>
           </div>
         </div>
       </div>
