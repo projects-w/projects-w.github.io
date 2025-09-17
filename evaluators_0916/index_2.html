@@ -158,9 +158,21 @@
           <button id="startBtn" class="primary">Start</button>
           <button id="resetBtn" class="ghost">Reset</button>
         </div>
-        <div style="max-width:800px">
+        <div style="max-width:1200px">
           <div class="instruction" id="instruction">
-            <strong>Instructions:</strong> For each question, you will see three candidate answers. For each candidate, choose either <em>Trust</em> (you believe the answer is correct) or <em>Don't Trust</em> (you believe the answer is incorrect). You have 60 seconds per question. When all questions are finished you will download a JSON file containing your per-answer judgments.
+            <strong>Instructions:</strong> You will be given a question along with three answers. Your task is to decide whether you trust each response.<br><br>
+
+            You do not need to calculate the exact solution. A quick review is enough to judge.<br><br>
+
+            Do not base your judgment on whether the final answer is correct — all answers may be wrong.<br><br>
+
+            Instead, focus on the reasoning process:<br><br>
+
+            Choose <b>Trust</b> if you find the reasoning reliable. Choose <b>Don't Trust</b> if the reasoning is unreliable.<br><br>
+
+            You will have 60 seconds per question.<br><br>
+
+            Example: A detailed and well-structured explanation leading to the wrong number should still be marked <b>Trust</b>. A disorganized or shallow explanation that accidentally lands on the correct number should be marked <b>Don't Trust</b>.
           </div>
         </div>
       </div>
