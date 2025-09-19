@@ -138,7 +138,7 @@
       <div class="topbar">
         <div class="progress" id="progress">Round 0 / 0</div>
         <div style="position: fixed; top: 5px; right: 5px;">
-          <div class="timer" id="timer">20s</div>
+          <div class="timer" id="timer">Time Left: 20s</div>
         </div>
       </div>
 
@@ -172,22 +172,23 @@
     }
 
     function escapeDollar(text) {
-        let formulas = [];
-        text = text.replace(/\$(.+?)\$/g, (match, p1) => {
-            formulas.push(match);
-            return `@@FORMULA${formulas.length-1}@@`;
-        });
+        // let formulas = [];
+        // text = text.replace(/\$(.+?)\$/g, (match, p1) => {
+        //     formulas.push(match);
+        //     return `@@FORMULA${formulas.length-1}@@`;
+        // });
 
-        text = text.replace(/\$(?=\d)/g, "\\$");
+        // text = text.replace(/\$(?=\d)/g, "\\$");
 
-        text = text.replace(/@@FORMULA(\d+)@@/g, (match, idx) => formulas[idx]);
+        // text = text.replace(/@@FORMULA(\d+)@@/g, (match, idx) => formulas[idx]);
 
         return text;
     }    
 
     function extractQuestion(raw){
       if(!raw) return '';
-      const s=raw.replace(/\\r/g,'').trim();
+      // const s=raw.replace(/\\r/g,'').trim();
+      const s = raw.replace(/\r/g, '').trim();
       const m=s.match(/user\n([\s\S]*?)(?:\nassistant|$)/i);
       if(m) return m[1].trim();
       return s.replace(/^(system|user|assistant)\n/ig,'').trim();
@@ -248,9 +249,9 @@
 
     function resetTimer(){
       clearInterval(timerInterval);timeLeft=20;
-      document.getElementById("timer").textContent=timeLeft+"s";
+      document.getElementById("timer").textContent="Time Left: "+timeLeft+"s";
       timerInterval=setInterval(()=>{
-        timeLeft--;document.getElementById("timer").textContent=timeLeft+"s";
+        timeLeft--;document.getElementById("timer").textContent="Time Left: "+timeLeft+"s";
         if(timeLeft<=0){clearInterval(timerInterval);autoTimeout();}
       },1000);
     }
