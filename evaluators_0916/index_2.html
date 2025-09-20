@@ -138,7 +138,7 @@
       <div class="topbar">
         <div class="progress" id="progress">Round 0 / 0</div>
         <div style="position: fixed; top: 5px; right: 5px;">
-          <div class="timer" id="timer">Time Left: 20s</div>
+          <div class="timer" id="timer">Time Left: 30s</div>
         </div>
       </div>
 
@@ -248,7 +248,7 @@
     }
 
     function resetTimer(){
-      clearInterval(timerInterval);timeLeft=20;
+      clearInterval(timerInterval);timeLeft=30;
       document.getElementById("timer").textContent="Time Left: "+timeLeft+"s";
       timerInterval=setInterval(()=>{
         timeLeft--;document.getElementById("timer").textContent="Time Left: "+timeLeft+"s";
